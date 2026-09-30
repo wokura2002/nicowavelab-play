@@ -2,16 +2,16 @@
 <html lang="ja">
 	<head>
 <meta property="og:type" content="website">
-<meta property="og:title" content="世紀末太鼓（試作）">
+<meta property="og:title" content="世紀末太鼓 〜協力リズム共鳴アクション〜">
 <meta property="og:description" content="2人で交互に太鼓を叩いて「共鳴」し、荒野の巨獣を倒す協力アクション。ひとりでも CPU の相棒と遊べます。">
 <meta property="og:url" content="https://play.nicowavelab.com/resonance/">
-<meta property="og:image" content="https://play.nicowavelab.com/resonance/20260930-1223-69c21e1/index.png">
+<meta property="og:image" content="https://play.nicowavelab.com/resonance/20260930-1414-1b99014/index.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="description" content="2人で交互に太鼓を叩いて「共鳴」し、荒野の巨獣を倒す協力アクション。ひとりでも CPU の相棒と遊べます。">
 <script>
 // GitHub Pages 版（tools/publish-pages.js が入れる）: 大きなファイルは gzip して ../files/ に置いてあるので、読み込むときにブラウザで展開する
 (function () {
-  var MAP = {"index.wasm":["../files/fc74679e3b97f768.wasm.gz","application/wasm"],"index.pck":["../files/d248b414b93d2205.pck.gz","application/octet-stream"]};
+  var MAP = {"index.wasm":["../files/fc74679e3b97f768.wasm.gz","application/wasm"],"index.pck":["../files/0b71067cea0a0bf0.pck.gz","application/octet-stream"]};
   var fetch0 = window.fetch.bind(window);
   window.fetch = function (input, init) {
     var url = typeof input === 'string' ? input : (input && input.url) || '';
@@ -26,7 +26,7 @@
 </script>
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0">
-		<title>世紀末太鼓</title>
+		<title>世紀末太鼓 〜協力リズム共鳴アクション〜</title>
 		<style>
 html, body, #canvas {
 	margin: 0;
@@ -249,6 +249,42 @@ body {
   };
 })();
 </script>
+<script>
+// 通信の確認用（?debug=1 の表示）: WebRTC の接続をつかまえておき、つながっている経路（TURN の中継か直接か、UDP か TCP か）・
+// 回線そのものの往復時間・1 秒あたりの送信量を、Net が 1 秒ごとに __nwlNetPoll() で調べて __nwlNetInfo から読む
+(function () {
+  var O = window.RTCPeerConnection;
+  if (!O) return;
+  var pcs = [];
+  var last = null;
+  window.RTCPeerConnection = function (a, b) { var pc = new O(a, b); pcs.push(pc); return pc; };
+  window.RTCPeerConnection.prototype = O.prototype;
+  window.__nwlNetInfo = '';
+  function kind(c) {
+    if (!c) return '?';
+    if (c.candidateType === 'relay') return 'TURN中継(' + (c.relayProtocol || c.protocol) + ')';
+    if (c.candidateType === 'host') return '直接(同じネットワーク,' + c.protocol + ')';
+    return '直接(' + c.candidateType + ',' + c.protocol + ')';
+  }
+  window.__nwlNetPoll = function () {
+    var pc = null;
+    for (var i = pcs.length - 1; i >= 0; i--) if (pcs[i].connectionState === 'connected') { pc = pcs[i]; break; }
+    if (!pc) { window.__nwlNetInfo = ''; return; }
+    pc.getStats().then(function (s) {
+      var tr = null, pair = null;
+      s.forEach(function (r) { if (r.type === 'transport') tr = r; });
+      if (!tr) return;
+      s.forEach(function (r) { if (r.type === 'candidate-pair' && r.id === tr.selectedCandidatePairId) pair = r; });
+      var now = performance.now();
+      var rate = last && now > last.t ? ((tr.bytesSent - last.b) / (now - last.t)).toFixed(1) + 'KB/s' : '?';
+      last = { t: now, b: tr.bytesSent };
+      var rtt = pair && pair.currentRoundTripTime != null ? Math.round(pair.currentRoundTripTime * 1000) + 'ms' : '?';
+      window.__nwlNetInfo = kind(pair && s.get(pair.localCandidateId)) + ' ⇄ ' + kind(pair && s.get(pair.remoteCandidateId)) +
+        '  回線の往復 ' + rtt + '  送信 ' + rate;
+    }).catch(function () {});
+  };
+})();
+</script>
 	</head>
 	<body>
 		<canvas id="canvas">
@@ -267,7 +303,7 @@ body {
 
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":6188136,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":6189976,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
