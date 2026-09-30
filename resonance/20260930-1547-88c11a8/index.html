@@ -3,15 +3,15 @@
 	<head>
 <meta property="og:type" content="website">
 <meta property="og:title" content="世紀末太鼓 〜協力リズム共鳴アクション〜">
-<meta property="og:description" content="2人で交互に太鼓を叩いて「共鳴」し、荒野の巨獣を倒す協力アクション。ひとりでも CPU の相棒と遊べます。">
+<meta property="og:description" content="2人で交互に太鼓を叩いて「共鳴」し、荒野のあらくれものを倒す協力アクション。ひとりでも CPU の相棒と遊べます。">
 <meta property="og:url" content="https://play.nicowavelab.com/resonance/">
-<meta property="og:image" content="https://play.nicowavelab.com/resonance/20260930-1442-96a2abd/index.png">
+<meta property="og:image" content="https://play.nicowavelab.com/resonance/20260930-1547-88c11a8/index.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="description" content="2人で交互に太鼓を叩いて「共鳴」し、荒野の巨獣を倒す協力アクション。ひとりでも CPU の相棒と遊べます。">
+<meta name="description" content="2人で交互に太鼓を叩いて「共鳴」し、荒野のあらくれものを倒す協力アクション。ひとりでも CPU の相棒と遊べます。">
 <script>
 // GitHub Pages 版（tools/publish-pages.js が入れる）: 大きなファイルは gzip して ../files/ に置いてあるので、読み込むときにブラウザで展開する
 (function () {
-  var MAP = {"index.wasm":["../files/fc74679e3b97f768.wasm.gz","application/wasm"],"index.pck":["../files/349437c32a7d0e06.pck.gz","application/octet-stream"]};
+  var MAP = {"index.wasm":["../files/fc74679e3b97f768.wasm.gz","application/wasm"],"index.pck":["../files/60da84f056f99bf4.pck.gz","application/octet-stream"]};
   var fetch0 = window.fetch.bind(window);
   window.fetch = function (input, init) {
     var url = typeof input === 'string' ? input : (input && input.url) || '';
@@ -26,7 +26,7 @@
   fetch0('../versions.json', { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (v) {
     var latest = v && v.length ? v[v.length - 1].version : '';
     // 今の版と違い、しかももう新しい版のフォルダにいるのでなければ移る（フォルダを写して試したときなどの行ったり来たりを防ぐ）
-    if (latest && latest !== "20260930-1442-96a2abd" && location.pathname.indexOf('/' + latest + '/') < 0) {
+    if (latest && latest !== "20260930-1547-88c11a8" && location.pathname.indexOf('/' + latest + '/') < 0) {
       location.replace('../' + latest + '/' + location.search + location.hash);
     }
   }).catch(function () {});
@@ -132,13 +132,16 @@ body {
 // バーの無いアプリの画面になる（上の apple-mobile-web-app-capable）。Safari で開いているときは、ゲームのタイトルで
 // そのやり方を案内する（window.__nwlHomeScreenHint が true のとき。ホーム画面から開いたとき・全画面にできる端末は false）
 (function () {
+  // iPhone は全画面にする機能があるように見えても、実際には全画面にならない（2026-09-30 に実機で案内が出なかった）ので、
+  // iPhone なら必ず案内する。iPad は全画面にできる版があるので、できないときだけ
   var ua = navigator.userAgent;
-  var ios = /iPhone|iPod/.test(ua) || (/iPad/.test(ua) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(ua)));
+  var iphone = /iPhone|iPod/.test(ua);
+  var ipad = /iPad/.test(ua) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(ua));
   var standalone = navigator.standalone === true ||
     (window.matchMedia && (matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches));
   var el = document.documentElement;
   var canFs = !!(el.requestFullscreen || el.webkitRequestFullscreen);
-  window.__nwlHomeScreenHint = ios && !standalone && !canFs;
+  window.__nwlHomeScreenHint = !standalone && (iphone || (ipad && !canFs));
 })();
 </script>
 <style>html,body,#canvas{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;overscroll-behavior:none;}</style>
@@ -248,7 +251,7 @@ body {
   var mobile = !!(window.matchMedia && matchMedia('(hover: none) and (pointer: coarse)').matches);
   var el = document.documentElement;
   var req = el.requestFullscreen || el.webkitRequestFullscreen;
-  if (!mobile || !req) return;
+  if (!mobile || !req || /iPhone|iPod/.test(navigator.userAgent)) return;
   var auto = true;
   try { auto = localStorage.getItem('nwl_fullscreen') !== '0'; } catch (e) {}
   var pending = false;
@@ -329,7 +332,7 @@ body {
 
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":6193544,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":6193848,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
