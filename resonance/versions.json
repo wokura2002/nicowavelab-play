@@ -1,13 +1,5 @@
 [
   {
-    "version": "20260930-1256-e26ccbf",
-    "date": "2026-09-30T03:56:29.741Z",
-    "files": [
-      "fc74679e3b97f768.wasm.gz",
-      "99eb5bfc750b7edf.pck.gz"
-    ]
-  },
-  {
     "version": "20260930-1403-f6d03d9",
     "date": "2026-09-30T05:03:42.641Z",
     "files": [
@@ -21,6 +13,14 @@
     "files": [
       "fc74679e3b97f768.wasm.gz",
       "0b71067cea0a0bf0.pck.gz"
+    ]
+  },
+  {
+    "version": "20260930-1442-96a2abd",
+    "date": "2026-09-30T05:42:00.170Z",
+    "files": [
+      "fc74679e3b97f768.wasm.gz",
+      "349437c32a7d0e06.pck.gz"
     ]
   }
 ]
