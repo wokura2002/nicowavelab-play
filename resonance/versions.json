@@ -14,5 +14,13 @@
       "fc74679e3b97f768.wasm.gz",
       "99eb5bfc750b7edf.pck.gz"
     ]
+  },
+  {
+    "version": "20260930-1403-f6d03d9",
+    "date": "2026-09-30T05:03:42.641Z",
+    "files": [
+      "fc74679e3b97f768.wasm.gz",
+      "7768ae895eab7c67.pck.gz"
+    ]
   }
 ]
