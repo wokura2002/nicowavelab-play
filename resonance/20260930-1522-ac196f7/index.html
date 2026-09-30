@@ -3,15 +3,15 @@
 	<head>
 <meta property="og:type" content="website">
 <meta property="og:title" content="世紀末太鼓 〜協力リズム共鳴アクション〜">
-<meta property="og:description" content="2人で交互に太鼓を叩いて「共鳴」し、荒野の巨獣を倒す協力アクション。ひとりでも CPU の相棒と遊べます。">
+<meta property="og:description" content="2人で交互に太鼓を叩いて「共鳴」し、荒野のあらくれものを倒す協力アクション。ひとりでも CPU の相棒と遊べます。">
 <meta property="og:url" content="https://play.nicowavelab.com/resonance/">
-<meta property="og:image" content="https://play.nicowavelab.com/resonance/20260930-1414-1b99014/index.png">
+<meta property="og:image" content="https://play.nicowavelab.com/resonance/20260930-1522-ac196f7/index.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="description" content="2人で交互に太鼓を叩いて「共鳴」し、荒野の巨獣を倒す協力アクション。ひとりでも CPU の相棒と遊べます。">
+<meta name="description" content="2人で交互に太鼓を叩いて「共鳴」し、荒野のあらくれものを倒す協力アクション。ひとりでも CPU の相棒と遊べます。">
 <script>
 // GitHub Pages 版（tools/publish-pages.js が入れる）: 大きなファイルは gzip して ../files/ に置いてあるので、読み込むときにブラウザで展開する
 (function () {
-  var MAP = {"index.wasm":["../files/fc74679e3b97f768.wasm.gz","application/wasm"],"index.pck":["../files/0b71067cea0a0bf0.pck.gz","application/octet-stream"]};
+  var MAP = {"index.wasm":["../files/fc74679e3b97f768.wasm.gz","application/wasm"],"index.pck":["../files/be5fdef82771c6fb.pck.gz","application/octet-stream"]};
   var fetch0 = window.fetch.bind(window);
   window.fetch = function (input, init) {
     var url = typeof input === 'string' ? input : (input && input.url) || '';
@@ -22,6 +22,14 @@
       return new Response(res.body.pipeThrough(new DecompressionStream('gzip')), { status: 200, headers: { 'Content-Type': m[1] } });
     });
   };
+  // 古い版の URL で開かれたら（ホーム画面に追加したアプリ・ブックマーク・開いたままのタブの再読み込み）、いちばん新しい版へ移る
+  fetch0('../versions.json', { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (v) {
+    var latest = v && v.length ? v[v.length - 1].version : '';
+    // 今の版と違い、しかももう新しい版のフォルダにいるのでなければ移る（フォルダを写して試したときなどの行ったり来たりを防ぐ）
+    if (latest && latest !== "20260930-1522-ac196f7" && location.pathname.indexOf('/' + latest + '/') < 0) {
+      location.replace('../' + latest + '/' + location.search + location.hash);
+    }
+  }).catch(function () {});
 })();
 </script>
 		<meta charset="utf-8">
@@ -115,6 +123,27 @@ body {
 		</style>
 		<link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
 <link rel="apple-touch-icon" href="index.apple-touch-icon.png"/>
+<meta name='apple-mobile-web-app-capable' content='yes'>
+<meta name='mobile-web-app-capable' content='yes'>
+<meta name='apple-mobile-web-app-status-bar-style' content='black-translucent'>
+<meta name='apple-mobile-web-app-title' content='世紀末太鼓'>
+<script>
+// iPhone の Safari は全画面にする仕組みが無く、アドレスバーやタブのバーで画面が狭くなる。ホーム画面に追加して開くと
+// バーの無いアプリの画面になる（上の apple-mobile-web-app-capable）。Safari で開いているときは、ゲームのタイトルで
+// そのやり方を案内する（window.__nwlHomeScreenHint が true のとき。ホーム画面から開いたとき・全画面にできる端末は false）
+(function () {
+  // iPhone は全画面にする機能があるように見えても、実際には全画面にならない（2026-09-30 に実機で案内が出なかった）ので、
+  // iPhone なら必ず案内する。iPad は全画面にできる版があるので、できないときだけ
+  var ua = navigator.userAgent;
+  var iphone = /iPhone|iPod/.test(ua);
+  var ipad = /iPad/.test(ua) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(ua));
+  var standalone = navigator.standalone === true ||
+    (window.matchMedia && (matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches));
+  var el = document.documentElement;
+  var canFs = !!(el.requestFullscreen || el.webkitRequestFullscreen);
+  window.__nwlHomeScreenHint = !standalone && (iphone || (ipad && !canFs));
+})();
+</script>
 <style>html,body,#canvas{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;overscroll-behavior:none;}</style>
 <script>
 // 軽くする: Godot の Web 版は、鳴っている音ごとに再生位置を毎回（約 3ms ごと、1 秒に約 375 回）音声のスレッドから知らせてくる。
@@ -222,7 +251,7 @@ body {
   var mobile = !!(window.matchMedia && matchMedia('(hover: none) and (pointer: coarse)').matches);
   var el = document.documentElement;
   var req = el.requestFullscreen || el.webkitRequestFullscreen;
-  if (!mobile || !req) return;
+  if (!mobile || !req || /iPhone|iPod/.test(navigator.userAgent)) return;
   var auto = true;
   try { auto = localStorage.getItem('nwl_fullscreen') !== '0'; } catch (e) {}
   var pending = false;
@@ -303,7 +332,7 @@ body {
 
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":6189976,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":6193560,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
