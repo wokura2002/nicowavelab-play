@@ -5,13 +5,13 @@
 <meta property="og:title" content="世紀末太鼓 〜協力リズム共鳴アクション〜">
 <meta property="og:description" content="2人で交互に太鼓を叩いて「共鳴」し、荒野のあらくれものを倒す協力アクション。ひとりでも CPU の相棒と遊べます。">
 <meta property="og:url" content="https://play.nicowavelab.com/resonance/">
-<meta property="og:image" content="https://play.nicowavelab.com/resonance/20260930-1643-e37b317/index.png">
+<meta property="og:image" content="https://play.nicowavelab.com/resonance/20260930-2224-7b13ccf/index.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="description" content="2人で交互に太鼓を叩いて「共鳴」し、荒野のあらくれものを倒す協力アクション。ひとりでも CPU の相棒と遊べます。">
 <script>
 // GitHub Pages 版（tools/publish-pages.js が入れる）: 大きなファイルは gzip して ../files/ に置いてあるので、読み込むときにブラウザで展開する
 (function () {
-  var MAP = {"index.wasm":["../files/fc74679e3b97f768.wasm.gz","application/wasm"],"index.pck":["../files/07064eef35831789.pck.gz","application/octet-stream"]};
+  var MAP = {"index.wasm":["../files/fc74679e3b97f768.wasm.gz","application/wasm"],"index.pck":["../files/4ec07734c0fa5df8.pck.gz","application/octet-stream"]};
   var fetch0 = window.fetch.bind(window);
   window.fetch = function (input, init) {
     var url = typeof input === 'string' ? input : (input && input.url) || '';
@@ -26,12 +26,13 @@
   fetch0('../versions.json', { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (v) {
     var latest = v && v.length ? v[v.length - 1].version : '';
     // 今の版と違い、しかももう新しい版のフォルダにいるのでなければ移る（フォルダを写して試したときなどの行ったり来たりを防ぐ）
-    if (latest && latest !== "20260930-1643-e37b317" && location.pathname.indexOf('/' + latest + '/') < 0) {
+    if (latest && latest !== "20260930-2224-7b13ccf" && location.pathname.indexOf('/' + latest + '/') < 0) {
       location.replace('../' + latest + '/' + location.search + location.hash);
     }
   }).catch(function () {});
 })();
 </script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"ff310fa4890640ff85e7385c08a94859"}'></script>
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0">
 		<title>世紀末太鼓 〜協力リズム共鳴アクション〜</title>
@@ -332,7 +333,7 @@ body {
 
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":6222960,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":6224096,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
