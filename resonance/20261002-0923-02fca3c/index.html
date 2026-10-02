@@ -5,13 +5,13 @@
 <meta property="og:title" content="世紀末太鼓 〜協力リズム共鳴アクション〜">
 <meta property="og:description" content="2人で交互に太鼓を叩いて「共鳴」し、荒野のあらくれものを倒す協力アクション。ひとりでも CPU の相棒と遊べます。">
 <meta property="og:url" content="https://play.nicowavelab.com/resonance/">
-<meta property="og:image" content="https://play.nicowavelab.com/resonance/20261001-2006-7580162/index.png">
+<meta property="og:image" content="https://play.nicowavelab.com/resonance/20261002-0923-02fca3c/index.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="description" content="2人で交互に太鼓を叩いて「共鳴」し、荒野のあらくれものを倒す協力アクション。ひとりでも CPU の相棒と遊べます。">
 <script>
 // GitHub Pages 版（tools/publish-pages.js が入れる）: 大きなファイルは gzip して ../files/ に置いてあるので、読み込むときにブラウザで展開する
 (function () {
-  var MAP = {"index.wasm":["../files/fc74679e3b97f768.wasm.gz","application/wasm"],"index.pck":["../files/44696f691d236bf6.pck.gz","application/octet-stream"]};
+  var MAP = {"index.wasm":["../files/fc74679e3b97f768.wasm.gz","application/wasm"],"index.pck":["../files/8a7b313c3c8abb63.pck.gz","application/octet-stream"]};
   var fetch0 = window.fetch.bind(window);
   window.fetch = function (input, init) {
     var url = typeof input === 'string' ? input : (input && input.url) || '';
@@ -26,7 +26,7 @@
   fetch0('../versions.json', { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (v) {
     var latest = v && v.length ? v[v.length - 1].version : '';
     // 今の版と違い、しかももう新しい版のフォルダにいるのでなければ移る（フォルダを写して試したときなどの行ったり来たりを防ぐ）
-    if (latest && latest !== "20261001-2006-7580162" && location.pathname.indexOf('/' + latest + '/') < 0) {
+    if (latest && latest !== "20261002-0923-02fca3c" && location.pathname.indexOf('/' + latest + '/') < 0) {
       location.replace('../' + latest + '/' + location.search + location.hash);
     }
   }).catch(function () {});
@@ -128,6 +128,10 @@ body {
 <meta name='mobile-web-app-capable' content='yes'>
 <meta name='apple-mobile-web-app-status-bar-style' content='black'>
 <meta name='apple-mobile-web-app-title' content='世紀末太鼓'>
+<!-- nwl-shared-head -->
+<!-- NicoWaveLab のゲーム共通（shared/web/head.html から tools/sync-shared.js が写す。ここを直接直さない）:
+  ホーム画面に追加の案内・上端の帯 / 音の再生位置の知らせを減らす / AudioContext の周波数と遅れ / 入力の時刻 /
+  音割れ対策のリミッター / スマホの全画面 / 通信の経路の確認（?debug=1）。中にダブルクォートとバックスラッシュを書かないこと（Godot の設定の文字列に入るため） -->
 <script>
 // iPhone の Safari は全画面にする仕組みが無く、アドレスバーやタブのバーで画面が狭くなる。ホーム画面に追加して開くと
 // バーの無いアプリの画面になる（上の apple-mobile-web-app-capable）。Safari で開いているときは、ゲームのタイトルで
@@ -142,6 +146,18 @@ body {
   var standalone = navigator.standalone === true ||
     (window.matchMedia && (matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches));
   window.__nwlHomeScreenHint = !standalone && (iphone || ipad);
+  // iOS・iPadOS 26 は、ホーム画面から開いたアプリの上端（時刻の帯の下 約 40pt）を Liquid Glass でぼかす。meta や CSS では
+  // 止められず、WebKit は「上端を覆う、背景色のある固定の箱（高さ 10px 超・幅 9 割以上）」があるときだけ、ぼかさずにその色で塗る。
+  // ボスの名前や体力のバーがぼやけた（2026-10-01）ので、ホーム画面から開いたときだけ、上端に黒い細い帯を置く。
+  // 帯の高さは window.__nwlTopInset でゲームに伝え、ゲームは HUD をその分だけ下から置く（UI.top_inset。ボタンが欠けないように）
+  if (standalone && (iphone || ipad)) {
+    window.__nwlTopInset = 12;
+    document.addEventListener('DOMContentLoaded', function () {
+      var cap = document.createElement('div');
+      cap.style.cssText = 'position:fixed;top:0;left:0;right:0;height:12px;background:#000;z-index:10;pointer-events:none';
+      document.body.appendChild(cap);
+    });
+  }
 })();
 </script>
 <style>html,body,#canvas{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;overscroll-behavior:none;}</style>
@@ -287,7 +303,13 @@ body {
   if (!O) return;
   var pcs = [];
   var last = null;
-  window.RTCPeerConnection = function (a, b) { var pc = new O(a, b); pcs.push(pc); return pc; };
+  window.RTCPeerConnection = function (a, b) {
+    var pc = new O(a, b);
+    // 閉じた接続は持ち続けない（試合のたびに溜まらないように）
+    pcs = pcs.filter(function (p) { return p.connectionState !== 'closed'; });
+    pcs.push(pc);
+    return pc;
+  };
   window.RTCPeerConnection.prototype = O.prototype;
   window.__nwlNetInfo = '';
   function kind(c) {
@@ -315,6 +337,7 @@ body {
   };
 })();
 </script>
+<!-- /nwl-shared-head -->
 	</head>
 	<body>
 		<canvas id="canvas">
@@ -333,7 +356,7 @@ body {
 
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":6280288,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":6323940,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
