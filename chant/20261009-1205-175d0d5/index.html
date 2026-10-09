@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="ja">
+	<head>
+<meta property="og:type" content="website">
+<meta property="og:title" content="えいしょう！ 〜叫べ、グランドスペル〜">
+<meta property="og:description" content="英語の呪文をマイクで唱えて叫び、砦を吹き飛ばす大魔法を放つ。1行唱えるごとに魔力がたまり、正しく唱えるほど呪文が強力になる。カタカナの読みつき。">
+<meta property="og:url" content="https://play.nicowavelab.com/chant/">
+<meta property="og:image" content="https://play.nicowavelab.com/chant/20261009-1205-175d0d5/index.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="description" content="英語の呪文をマイクで唱えて叫び、砦を吹き飛ばす大魔法を放つ。1行唱えるごとに魔力がたまり、正しく唱えるほど呪文が強力になる。カタカナの読みつき。">
+<script>
+// GitHub Pages 版（tools/publish-pages.js が入れる）: 大きなファイルは gzip して ../files/ に置いてあるので、読み込むときにブラウザで展開する
+(function () {
+  var MAP = {"index.wasm":["../files/fc74679e3b97f768.wasm.gz","application/wasm"],"index.pck":["../files/c13a18e984edef45.pck.gz","application/octet-stream"]};
+  var fetch0 = window.fetch.bind(window);
+  window.fetch = function (input, init) {
+    var url = typeof input === 'string' ? input : (input && input.url) || '';
+    var m = MAP[url.split('?')[0].split('/').pop()];
+    if (!m || typeof DecompressionStream === 'undefined') return fetch0(input, init);
+    return fetch0(m[0], init).then(function (res) {
+      if (!res.ok) return res;
+      return new Response(res.body.pipeThrough(new DecompressionStream('gzip')), { status: 200, headers: { 'Content-Type': m[1] } });
+    });
+  };
+  // 古い版の URL で開かれたら（ホーム画面に追加したアプリ・ブックマーク・開いたままのタブの再読み込み）、いちばん新しい版へ移る
+  fetch0('../versions.json', { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (v) {
+    var latest = v && v.length ? v[v.length - 1].version : '';
+    // 今の版と違い、しかももう新しい版のフォルダにいるのでなければ移る（フォルダを写して試したときなどの行ったり来たりを防ぐ）
+    if (latest && latest !== "20261009-1205-175d0d5" && location.pathname.indexOf('/' + latest + '/') < 0) {
+      location.replace('../' + latest + '/' + location.search + location.hash);
+    }
+  }).catch(function () {});
+})();
+</script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"ff310fa4890640ff85e7385c08a94859"}'></script>
+		<meta charset="utf-8">
+<script>
+// 読み込みを速くする: Godot（4.7 の Web 版・Compatibility の描画）が、描画に使わないシェーダーを組み上げて止まるのを避ける。
+// tools/export-portal.js がポータル用の書き出しの head に入れる（Godot が WebGL を作る前に動くこと）。
+//
+// Godot は材質のシェーダーを初めて使うとき、描画の種類ごとに「既定の版」（点の明かり・スポットライト・ライトマップの計算を
+// 全部入れたもの）を先に組み上げる（drivers/gles3/shader_gles3.cpp の _initialize_version）。実際の描画は、使わない計算を
+// 省いた別の版（DISABLE_LIGHTMAP などの印つき）を改めて組み上げて使うので、既定の版は描画に使われない。
+// ところが Windows のブラウザ（ANGLE で Direct3D 11 に変換）では、この大きな既定の版が1つ 1〜3 秒かかり、その間ページが止まる
+// （世紀末太鼓で、光を受ける材質 4 種類 × 2 で合計 14〜20 秒。2026-10-08 にこの PC で測定。docs/performance.md）。
+// そこで、既定の版だと分かるシェーダー（BASE_PASS の印があり、ライトマップの印が1つも無く、影・深さ・足し合わせの光でもないもの）
+// だけ、中身を何も描かない小さなシェーダーに差し替えて、すぐ組み上がるようにする。
+// 万一その版が描画に使われたら（Godot の版が変わって作りが違うときなど）、コンソールに "[nwl] fast-shaders" の警告を出す。
+(function () {
+  var G = window.WebGL2RenderingContext;
+  if (!G || window.__nwlFastShaders === false) return;
+  var P = G.prototype;
+  var VS = '#version 300 es\nvoid main() { gl_Position = vec4(0.0); }\n';
+  var FS = '#version 300 es\nprecision mediump float;\nout vec4 nwl_out;\nvoid main() { nwl_out = vec4(0.0); }\n';
+  var stubShaders = new WeakSet();
+  var programShaders = new WeakMap();
+  var stubPrograms = new WeakSet();
+  var stats = { replaced: 0, warned: 0 };
+  window.__nwlFastShaders = stats;
+
+  function isUnusedDefault(src) {
+    return src.indexOf('#define BASE_PASS') >= 0 &&
+      src.indexOf('#define DISABLE_LIGHTMAP') < 0 && src.indexOf('#define USE_LIGHTMAP') < 0 &&
+      src.indexOf('#define MODE_RENDER_DEPTH') < 0 && src.indexOf('#define USE_ADDITIVE_LIGHTING') < 0 &&
+      src.indexOf('#define RENDER_MATERIAL') < 0;
+  }
+
+  var shaderSource = P.shaderSource;
+  P.shaderSource = function (shader, src) {
+    if (typeof src === 'string' && isUnusedDefault(src)) {
+      var type = this.getShaderParameter(shader, this.SHADER_TYPE);
+      stubShaders.add(shader);
+      stats.replaced++;
+      return shaderSource.call(this, shader, type === this.VERTEX_SHADER ? VS : FS);
+    }
+    return shaderSource.call(this, shader, src);
+  };
+  var attachShader = P.attachShader;
+  P.attachShader = function (program, shader) {
+    var list = programShaders.get(program) || [];
+    list.push(shader);
+    programShaders.set(program, list);
+    return attachShader.call(this, program, shader);
+  };
+  var linkProgram = P.linkProgram;
+  P.linkProgram = function (program) {
+    var list = programShaders.get(program) || [];
+    if (list.length && list.every(function (s) { return stubShaders.has(s); })) stubPrograms.add(program);
+    return linkProgram.call(this, program);
+  };
+  // 差し替えた版で描こうとしたら知らせる（描かれないはずなので、出たら作りが変わっている）。確かめるとき（?debug・?autotest）だけ見張る
+  // （ふだんは描画のたびの処理を足さない）
+  if (!/[?&](debug|autotest)=/.test(location.search)) return;
+  var useProgram = P.useProgram;
+  P.useProgram = function (program) {
+    if (program && stubPrograms.has(program)) this.__nwlStubBound = true;
+    else this.__nwlStubBound = false;
+    return useProgram.call(this, program);
+  };
+  ['drawArrays', 'drawElements', 'drawArraysInstanced', 'drawElementsInstanced', 'drawRangeElements'].forEach(function (name) {
+    var orig = P[name];
+    if (!orig) return;
+    P[name] = function () {
+      if (this.__nwlStubBound && stats.warned < 5) {
+        stats.warned++;
+        console.warn('[nwl] fast-shaders: 差し替えたシェーダーで描こうとした（Godot の作りが変わった？ shared/web/fast-shaders.js）');
+      }
+      return orig.apply(this, arguments);
+    };
+  });
+})();
+</script>
+
+		<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0">
+		<title>えいしょう！ 〜叫べ、グランドスペル〜</title>
+		<style>
+html, body, #canvas {
+	margin: 0;
+	padding: 0;
+	border: 0;
+}
+
+body {
+	color: white;
+	background-color: black;
+	overflow: hidden;
+	touch-action: none;
+}
+
+#canvas {
+	display: block;
+}
+
+#canvas:focus {
+	outline: none;
+}
+
+#status, #status-splash, #status-progress {
+	position: absolute;
+	left: 0;
+	right: 0;
+}
+
+#status, #status-splash {
+	top: 0;
+	bottom: 0;
+}
+
+#status {
+	background-color: #080512;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	visibility: hidden;
+}
+
+#status-splash {
+	max-height: 100%;
+	max-width: 100%;
+	margin: auto;
+}
+
+#status-splash.show-image--false {
+	display: none;
+}
+
+#status-splash.fullsize--true {
+	height: 100%;
+	width: 100%;
+	object-fit: contain;
+}
+
+#status-splash.use-filter--false {
+	image-rendering: pixelated;
+}
+
+#status-progress, #status-notice {
+	display: none;
+}
+
+#status-progress {
+	bottom: 10%;
+	width: 50%;
+	margin: 0 auto;
+}
+
+#status-notice {
+	background-color: #5b3943;
+	border-radius: 0.5rem;
+	border: 1px solid #9b3943;
+	color: #e0e0e0;
+	font-family: 'Noto Sans', 'Droid Sans', Arial, sans-serif;
+	line-height: 1.3;
+	margin: 0 2rem;
+	overflow: hidden;
+	padding: 1rem;
+	text-align: center;
+	z-index: 1;
+}
+		</style>
+		<link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
+<link rel="apple-touch-icon" href="index.apple-touch-icon.png"/>
+<meta name='apple-mobile-web-app-capable' content='yes'>
+<meta name='mobile-web-app-capable' content='yes'>
+<meta name='apple-mobile-web-app-status-bar-style' content='black'>
+<meta name='apple-mobile-web-app-title' content='えいしょう！'>
+<!-- nwl-shared-head -->
+<!-- NicoWaveLab のゲーム共通（shared/web/head.html から tools/sync-shared.js が写す。ここを直接直さない）:
+  ホーム画面に追加の案内・上端の帯 / 音の再生位置の知らせを減らす / AudioContext の周波数と遅れ / 入力の時刻 /
+  音割れ対策のリミッター / スマホの全画面 / 通信の経路の確認（?debug=1） / コマ数の上限（__nwlCapFps）。中にダブルクォートとバックスラッシュを書かないこと（Godot の設定の文字列に入るため） -->
+<script>
+// iPhone の Safari は全画面にする仕組みが無く、アドレスバーやタブのバーで画面が狭くなる。ホーム画面に追加して開くと
+// バーの無いアプリの画面になる（上の apple-mobile-web-app-capable）。Safari で開いているときは、ゲームのタイトルで
+// そのやり方を案内する（window.__nwlHomeScreenHint が true のとき。ホーム画面から開いたとき・全画面にできる端末は false）
+(function () {
+  // iPhone は全画面にする機能があるように見えても、実際には全画面にならない（2026-09-30 に実機で案内が出なかった）。
+  // iPad は全画面にはなるが、太鼓を速く叩くと Safari が「フルスクリーンでタイプ入力しているようです」（偽のキーボードで
+  // 情報を盗む詐欺への警告）を出して止まる（2026-10-01）。どちらもページの全画面は使わず、ホーム画面に追加する案内を出す
+  var ua = navigator.userAgent;
+  var iphone = /iPhone|iPod/.test(ua);
+  var ipad = /iPad/.test(ua) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(ua));
+  var standalone = navigator.standalone === true ||
+    (window.matchMedia && (matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches));
+  // ポータル（CrazyGames など。tools/export-portal.js が window.__nwlPortal を入れる）の中では出さない（ページはポータルの枠の中）
+  window.__nwlHomeScreenHint = !standalone && (iphone || ipad) && !window.__nwlPortal;
+  // iOS・iPadOS 26 は、ホーム画面から開いたアプリの上端（時刻の帯の下 約 40pt）を Liquid Glass でぼかす。meta や CSS では
+  // 止められず、WebKit は「上端を覆う、背景色のある固定の箱（高さ 10px 超・幅 9 割以上）」があるときだけ、ぼかさずにその色で塗る。
+  // ボスの名前や体力のバーがぼやけた（2026-10-01）ので、ホーム画面から開いたときだけ、上端に黒い細い帯を置く。
+  // 帯の高さは window.__nwlTopInset でゲームに伝え、ゲームは HUD をその分だけ下から置く（UI.top_inset。ボタンが欠けないように）
+  if (standalone && (iphone || ipad)) {
+    window.__nwlTopInset = 12;
+    document.addEventListener('DOMContentLoaded', function () {
+      var cap = document.createElement('div');
+      cap.style.cssText = 'position:fixed;top:0;left:0;right:0;height:12px;background:#000;z-index:10;pointer-events:none';
+      document.body.appendChild(cap);
+    });
+  }
+})();
+</script>
+<style>html,body,#canvas{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;overscroll-behavior:none;}</style>
+<script>
+// 軽くする: Godot の Web 版は、鳴っている音ごとに再生位置を毎回（約 3ms ごと、1 秒に約 375 回）音声のスレッドから知らせてくる。
+// 音が重なると、その受け取りだけで画面の処理が重くなる（スマホで目立つ）。このゲームは Web 版で再生位置を使わないので、
+// 知らせる処理（godot-position-reporting-processor）を、16 回に 1 回（約 43ms ごと）だけ知らせる同じ名前の版に差し替える
+(function () {
+  if (!window.AudioWorklet || !AudioWorklet.prototype.addModule) return;
+  var src = `class P extends AudioWorkletProcessor {
+    static get parameterDescriptors() { return [{ name: 'reset', defaultValue: 0, minValue: 0, maxValue: 1, automationRate: 'k-rate' }]; }
+    constructor(...a) { super(...a); this.position = 0; this.n = 0; }
+    process(inputs, outputs, params) {
+      if (params.reset[0] > 0) { this.position = 0; this.n = 0; }
+      const input = inputs[0];
+      if (input && input.length > 0) {
+        this.position += input[0].length;
+        if ((this.n++ & 15) === 0) this.port.postMessage({ type: 'position', data: this.position });
+      }
+      return true;
+    }
+  }
+  registerProcessor('godot-position-reporting-processor', P);`;
+  var url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+  var orig = AudioWorklet.prototype.addModule;
+  AudioWorklet.prototype.addModule = function (path, opts) {
+    if (typeof path === 'string' && path.indexOf('audio.position.worklet') >= 0) path = url;
+    return orig.call(this, path, opts);
+  };
+})();
+</script>
+<script>
+// 音の遅れを減らす: Godot は AudioContext を 44.1kHz に固定して作るが、Android の多くは 48kHz で、変換のぶん遅れが増え、
+// 低遅延の経路も使われにくい。周波数の指定を外して端末の周波数で作る（Godot は実際の周波数を読み戻して合わせる。
+// 効果音はそれぞれ自分の周波数でバッファを作るので影響しない）。遅れは小さい方（interactive）を頼む
+(function () {
+  var AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return;
+  function NwlAudioContext(opts) {
+    var o = {};
+    for (var k in (opts || {})) if (k !== 'sampleRate') o[k] = opts[k];
+    o.latencyHint = 'interactive';
+    var c = new AC(o);
+    window.__nwlAudioContexts && window.__nwlAudioContexts.push(c);
+    return c;
+  }
+  NwlAudioContext.prototype = AC.prototype;
+  // 画面を消したときに止めるため、作った AudioContext を覚えておく（下の「画面が隠れたら音を止める」）
+  var made = [];
+  window.__nwlAudioContexts = made;
+  window.AudioContext = NwlAudioContext;
+  if (window.webkitAudioContext) window.webkitAudioContext = NwlAudioContext;
+  // デバッグ表示用: ブラウザが申告する音の遅れ（ms）と周波数
+  window.__nwlAudioInfo = function () {
+    var c = window.__nwlLimiter && window.__nwlLimiter.ctx;
+    if (!c) return '';
+    return Math.round(((c.baseLatency || 0) + (c.outputLatency || 0)) * 1000) + ' ms / ' + c.sampleRate + ' Hz';
+  };
+})();
+// 入力の時刻: 指が触れた（ボタン・キーを押した）瞬間の時刻を覚えておく。Godot は次のコマの処理で入力を受け取るので、
+// コマが遅い・揺れる端末ほど、太鼓の判定の時刻が遅れて揺れる。ゲームは「今 - この時刻」だけ判定の時刻を戻す
+(function () {
+  var last = 0;
+  function mark(e) { last = e.timeStamp || performance.now(); }
+  window.addEventListener('touchstart', mark, { capture: true, passive: true });
+  window.addEventListener('mousedown', mark, { capture: true, passive: true });
+  window.addEventListener('keydown', mark, { capture: true, passive: true });
+  window.__nwlInputAge = function () {
+    var a = last ? performance.now() - last : 0;
+    return a >= 0 && a < 1000 ? a : 0;
+  };
+})();
+</script><script>
+// 音割れ対策: Web Audio の出力（destination）の手前にリミッターを挟む。
+// 音の合計が 0dB を超えると、Windows は OS 側で抑えるので目立たないが、Android では割れる。
+// Godot の Web 版（サンプル再生）はバスのエフェクトが効かないので、ここで AudioContext の destination を差し替える。
+// しきい値 -3dB・ratio 20 のコンプレッサー（ほぼリミッター。Chromium は 6ms 先読みで立ち上がりも抑える）の後で
+// 1.5dB 下げる（コンプレッサーの自動の持ち上げを打ち消す）。試合中の音の合計は最大 +10dB ほどになるが、出力は 0dB 未満に収まる
+(function () {
+  var B = window.BaseAudioContext || window.AudioContext || window.webkitAudioContext;
+  if (!B) return;
+  var d = Object.getOwnPropertyDescriptor(B.prototype, 'destination');
+  if (!d || !d.get) return;
+  var made = new WeakMap();
+  Object.defineProperty(B.prototype, 'destination', { configurable: true, enumerable: d.enumerable, get: function () {
+    var real = d.get.call(this);
+    if (window.OfflineAudioContext && this instanceof OfflineAudioContext) return real;
+    var n = made.get(this);
+    if (n) return n;
+    try {
+      var i = this.createGain(), c = this.createDynamicsCompressor(), o = this.createGain();
+      c.threshold.value = -3; c.knee.value = 2; c.ratio.value = 20; c.attack.value = 0.001; c.release.value = 0.15;
+      o.gain.value = Math.pow(10, -1.5 / 20);
+      i.connect(c); c.connect(o); o.connect(real);
+      n = i;
+      window.__nwlLimiter = { ctx: this, input: i, output: o, comp: c };
+    } catch (e) {
+      n = real;
+    }
+    made.set(this, n);
+    return n;
+  } });
+})();
+</script>
+<script>
+// 画面が隠れたら音を止める: スマホで画面を消した・ほかのアプリやタブに移ったとき、ページの処理は止まるが、Web Audio は鳴り続ける
+// （BGM のループや鳴りかけの音。2026-10-06 に遊んだ人の指摘）。隠れたら AudioContext を止め、見えたら再開する。
+// 再開するのは、この仕組みで止めたものだけ（ゲームが自分で止めた音には触らない）
+(function () {
+  var stopped = [];
+  function all() {
+    var list = (window.__nwlAudioContexts || []).slice();
+    var l = window.__nwlLimiter && window.__nwlLimiter.ctx;
+    if (l && list.indexOf(l) < 0) list.push(l);
+    return list;
+  }
+  // iPhone・iPad の Safari は、タブを移すと自分で AudioContext を中断（state が 'interrupted'）するので、それも再開の対象にする。
+  // 中断された AudioContext の resume() は、中断が明けるまで終わらない（失敗も返さない）。Safari の音の仕組みを起こすには、
+  // タップの中で resume() を呼び、無音を一瞬鳴らす。なので、見えた後もまだ動いていないものは、動くまで、タップのたびにそうする
+  // （と 1 秒ごとにも resume() を呼ぶ）（2026-10-09: iPad でタブを変えて戻ると、えいしょう！の効果音とマイクが止まったまま。
+  // 音量のボタンを押すと直った）
+  var waiting = [];
+  function hide() {
+    all().forEach(function (c) {
+      if ((c.state === 'running' || c.state === 'interrupted') && stopped.indexOf(c) < 0) {
+        stopped.push(c);
+        if (c.state === 'running') c.suspend().catch(function () {});
+      }
+    });
+  }
+  function wake(c, tap) {
+    if (c.state === 'closed' || c.state === 'running') return;
+    c.resume().catch(function () {});
+    if (!tap) return;
+    try {
+      var b = c.createBuffer(1, 1, c.sampleRate);
+      var s = c.createBufferSource();
+      s.buffer = b;
+      s.connect(c.destination);
+      s.start(0);
+    } catch (e) {}
+  }
+  function show() {
+    var list = stopped;
+    stopped = [];
+    // 隠れている間に Safari が中断したもの（hide の後に中断された）も
+    all().forEach(function (c) { if (c.state === 'interrupted' && list.indexOf(c) < 0) list.push(c); });
+    list.forEach(function (c) {
+      wake(c, false);
+      if (waiting.indexOf(c) < 0) waiting.push(c);
+    });
+  }
+  // 戻った後の最初のタップ: Safari は state が 'running' に戻っても音が出ないままのことがあるので、動いているものも一度止めて動かし直す
+  // （iPhone・iPad だけ。ほかで動かし直すと、一瞬音が途切れる）
+  var kick = [];
+  var iosAudio = /iPhone|iPod|iPad/.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+  document.addEventListener('visibilitychange', function () { if (!document.hidden && iosAudio) kick = all(); });
+  function onTap() {
+    if (kick.length) {
+      var k = kick;
+      kick = [];
+      k.forEach(function (c) {
+        if (c.state === 'running' && stopped.indexOf(c) < 0) {
+          c.suspend().then(function () { return c.resume(); }).catch(function () {});
+        } else {
+          wake(c, true);
+        }
+      });
+    }
+    waiting = waiting.filter(function (c) { return c.state !== 'running' && c.state !== 'closed'; });
+    all().forEach(function (c) { if (c.state === 'interrupted' && waiting.indexOf(c) < 0) waiting.push(c); });
+    waiting.forEach(function (c) { wake(c, true); });
+  }
+  setInterval(function () {
+    if (document.hidden || !waiting.length) return;
+    waiting = waiting.filter(function (c) { return c.state !== 'running' && c.state !== 'closed'; });
+    waiting.forEach(function (c) { wake(c, false); });
+  }, 1000);
+  document.addEventListener('touchend', onTap, true);
+  document.addEventListener('pointerup', onTap, true);
+  document.addEventListener('visibilitychange', function () { if (document.hidden) hide(); else show(); });
+  window.addEventListener('pagehide', hide);
+  window.addEventListener('pageshow', function () { if (!document.hidden) show(); });
+})();
+</script>
+<script>
+// スマホのブラウザで全画面にする（アドレスバーやナビゲーションバーを消して、画面を広く使う）。
+// 全画面にできるのはタップを離した瞬間（ユーザー操作の中）だけなので、タップを離すたびに、全画面でなければ全画面にする
+// （戻るジェスチャーなどで抜けても、次のタップで戻る）。全画面になったら横向きに固定する。
+// ゲームの設定で「しない」にできる（localStorage の nwl_fullscreen = '0'。ゲームからは window.__nwlFullscreen で操作する）。
+// iPhone・iPad では使わない（iPhone は全画面にならず、iPad は速く叩くと Safari の詐欺の警告が出る。ホーム画面に追加して遊ぶ）
+(function () {
+  var mobile = !!(window.matchMedia && matchMedia('(hover: none) and (pointer: coarse)').matches);
+  var el = document.documentElement;
+  var req = el.requestFullscreen || el.webkitRequestFullscreen;
+  var ios = /iPhone|iPod|iPad/.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+  // ポータルの中では使わない（全画面はポータルの枠が受け持ち、ゲームが自分で全画面にすることを禁じている）
+  if (!mobile || !req || ios || window.__nwlPortal) return;
+  var auto = true;
+  try { auto = localStorage.getItem('nwl_fullscreen') !== '0'; } catch (e) {}
+  var pending = false;
+  function isFs() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+  function enter() {
+    if (!auto || pending || isFs()) return;
+    pending = true;
+    var p;
+    try { p = req.call(el, { navigationUI: 'hide' }); } catch (e) { pending = false; return; }
+    Promise.resolve(p).then(function () {
+      if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(function () {});
+    }).catch(function () {}).then(function () { pending = false; });
+  }
+  document.addEventListener('pointerup', function (e) { if (e.pointerType !== 'mouse') enter(); }, true);
+  document.addEventListener('touchend', enter, true);
+  window.__nwlFullscreen = {
+    isAuto: function () { return auto; },
+    setAuto: function (on) {
+      auto = !!on;
+      try { localStorage.setItem('nwl_fullscreen', auto ? '1' : '0'); } catch (e) {}
+      if (auto) enter();
+      else if (isFs()) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    }
+  };
+})();
+</script>
+<script>
+// 通信の確認用（?debug=1 の表示）: WebRTC の接続をつかまえておき、つながっている経路（TURN の中継か直接か、UDP か TCP か）・
+// 回線そのものの往復時間・1 秒あたりの送信量を、Net が 1 秒ごとに __nwlNetPoll() で調べて __nwlNetInfo から読む
+(function () {
+  var O = window.RTCPeerConnection;
+  if (!O) return;
+  var pcs = [];
+  var last = null;
+  window.RTCPeerConnection = function (a, b) {
+    var pc = new O(a, b);
+    // 閉じた接続は持ち続けない（試合のたびに溜まらないように）
+    pcs = pcs.filter(function (p) { return p.connectionState !== 'closed'; });
+    pcs.push(pc);
+    return pc;
+  };
+  window.RTCPeerConnection.prototype = O.prototype;
+  window.__nwlNetInfo = '';
+  function kind(c) {
+    if (!c) return '?';
+    if (c.candidateType === 'relay') return 'TURN中継(' + (c.relayProtocol || c.protocol) + ')';
+    if (c.candidateType === 'host') return '直接(同じネットワーク,' + c.protocol + ')';
+    return '直接(' + c.candidateType + ',' + c.protocol + ')';
+  }
+  window.__nwlNetPoll = function () {
+    var pc = null;
+    for (var i = pcs.length - 1; i >= 0; i--) if (pcs[i].connectionState === 'connected') { pc = pcs[i]; break; }
+    if (!pc) { window.__nwlNetInfo = ''; return; }
+    pc.getStats().then(function (s) {
+      var tr = null, pair = null;
+      s.forEach(function (r) { if (r.type === 'transport') tr = r; });
+      if (!tr) return;
+      s.forEach(function (r) { if (r.type === 'candidate-pair' && r.id === tr.selectedCandidatePairId) pair = r; });
+      var now = performance.now();
+      var rate = last && now > last.t ? ((tr.bytesSent - last.b) / (now - last.t)).toFixed(1) + 'KB/s' : '?';
+      last = { t: now, b: tr.bytesSent };
+      var rtt = pair && pair.currentRoundTripTime != null ? Math.round(pair.currentRoundTripTime * 1000) + 'ms' : '?';
+      window.__nwlNetInfo = kind(pair && s.get(pair.localCandidateId)) + ' ⇄ ' + kind(pair && s.get(pair.remoteCandidateId)) +
+        '  回線の往復 ' + rtt + '  送信 ' + rate;
+    }).catch(function () {});
+  };
+})();
+</script>
+<script>
+// コマ数の上限（スマホの発熱を抑える）: ゲームは JavaScriptBridge から window.__nwlCapFps(コマ数) を呼ぶ（0 で外す）。
+// Godot の Web 版で Engine.max_fps を使うと、待つ間を空回りで潰してメインスレッドが 100% 忙しくなる（docs/performance.md）ので、
+// ブラウザの requestAnimationFrame を間引く（Emscripten の main loop は毎回 globalThis.requestAnimationFrame を呼ぶ）。
+// 間引いた後のコマでは、そのとき並んでいる呼び出しを全部まとめて呼ぶ（本物の requestAnimationFrame と同じく、同じ時刻を渡す）。
+// 前の作り（各ゲームの cap_fps）は呼び出しごとに順番を待たせていたので、ほかに毎コマ頼み続ける呼び出し（CrazyGames の SDK の
+// fps の計測。ゲームが遊び始めたと知らせたその場で頼むので、毎回ゲームより先に並ぶ）があると、毎回そちらが先に通ってゲームが止まった
+// （2026-10-08。CrazyGames のスマホで、横にすると真っ黒・音だけ鳴る。tools/check-portal.mjs --mobile で確かめる）
+(function () {
+  var raf = window.requestAnimationFrame.bind(window);
+  var caf = window.cancelAnimationFrame.bind(window);
+  var interval = 0;
+  var next = 0;
+  var queue = [];
+  var ticking = false;
+  var seq = 0;
+  function tick(ts) {
+    // 画面の更新の揺れで1コマ飛ばさないよう、間隔の 1/4 の手前から動かす。遅れたら追いつかずに今から数え直す
+    if (ts >= next - interval / 4) {
+      next = Math.max(next + interval, ts);
+      var q = queue;
+      queue = [];
+      for (var i = 0; i < q.length; i++) {
+        try { q[i][1](ts); } catch (e) { setTimeout(function () { throw e; }); }
+      }
+    }
+    if (queue.length) raf(tick);
+    else ticking = false;
+  }
+  function request(cb) {
+    var id = ++seq;
+    queue.push([id, cb]);
+    if (!ticking) {
+      ticking = true;
+      raf(tick);
+    }
+    return id;
+  }
+  function cancel(id) {
+    for (var i = 0; i < queue.length; i++) {
+      if (queue[i][0] === id) {
+        queue.splice(i, 1);
+        return;
+      }
+    }
+  }
+  window.__nwlCapFps = function (cap) {
+    if (cap > 0) {
+      interval = 1000 / cap;
+      window.requestAnimationFrame = request;
+      window.cancelAnimationFrame = cancel;
+    } else {
+      // 外す: もう並んでいる呼び出しは次のコマで呼ぶ（tick が残りを片付ける）
+      interval = 0;
+      next = 0;
+      window.requestAnimationFrame = raf;
+      window.cancelAnimationFrame = caf;
+    }
+  };
+})();
+</script>
+<!-- /nwl-shared-head -->
+	</head>
+	<body>
+		<canvas id="canvas">
+			Your browser does not support the canvas tag.
+		</canvas>
+
+		<noscript>
+			Your browser does not support JavaScript.
+		</noscript>
+
+		<div id="status">
+			<img id="status-splash" class="show-image--true fullsize--true use-filter--true" src="index.png" alt="">
+			<progress id="status-progress"></progress>
+			<div id="status-notice"></div>
+		</div>
+
+		<script src="index.js"></script>
+		<script>
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":1727112,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_THREADS_ENABLED = false;
+const engine = new Engine(GODOT_CONFIG);
+
+(function () {
+	const statusOverlay = document.getElementById('status');
+	const statusProgress = document.getElementById('status-progress');
+	const statusNotice = document.getElementById('status-notice');
+
+	let initializing = true;
+	let statusMode = '';
+
+	function setStatusMode(mode) {
+		if (statusMode === mode || !initializing) {
+			return;
+		}
+		if (mode === 'hidden') {
+			statusOverlay.remove();
+			initializing = false;
+			return;
+		}
+		statusOverlay.style.visibility = 'visible';
+		statusProgress.style.display = mode === 'progress' ? 'block' : 'none';
+		statusNotice.style.display = mode === 'notice' ? 'block' : 'none';
+		statusMode = mode;
+	}
+
+	function setStatusNotice(text) {
+		while (statusNotice.lastChild) {
+			statusNotice.removeChild(statusNotice.lastChild);
+		}
+		const lines = text.split('\n');
+		lines.forEach((line) => {
+			statusNotice.appendChild(document.createTextNode(line));
+			statusNotice.appendChild(document.createElement('br'));
+		});
+	}
+
+	function displayFailureNotice(err) {
+		console.error(err);
+		if (err instanceof Error) {
+			setStatusNotice(err.message);
+		} else if (typeof err === 'string') {
+			setStatusNotice(err);
+		} else {
+			setStatusNotice('An unknown error occurred.');
+		}
+		setStatusMode('notice');
+		initializing = false;
+	}
+
+	const missing = Engine.getMissingFeatures({
+		threads: GODOT_THREADS_ENABLED,
+	});
+
+	if (missing.length !== 0) {
+		if (GODOT_CONFIG['serviceWorker'] && GODOT_CONFIG['ensureCrossOriginIsolationHeaders'] && 'serviceWorker' in navigator) {
+			let serviceWorkerRegistrationPromise;
+			try {
+				serviceWorkerRegistrationPromise = navigator.serviceWorker.getRegistration();
+			} catch (err) {
+				serviceWorkerRegistrationPromise = Promise.reject(new Error('Service worker registration failed.'));
+			}
+			// There's a chance that installing the service worker would fix the issue
+			Promise.race([
+				serviceWorkerRegistrationPromise.then((registration) => {
+					if (registration != null) {
+						return Promise.reject(new Error('Service worker already exists.'));
+					}
+					return registration;
+				}).then(() => engine.installServiceWorker()),
+				// For some reason, `getRegistration()` can stall
+				new Promise((resolve) => {
+					setTimeout(() => resolve(), 2000);
+				}),
+			]).then(() => {
+				// Reload if there was no error.
+				window.location.reload();
+			}).catch((err) => {
+				console.error('Error while registering service worker:', err);
+			});
+		} else {
+			// Display the message as usual
+			const missingMsg = 'Error\nThe following features required to run Godot projects on the Web are missing:\n';
+			displayFailureNotice(missingMsg + missing.join('\n'));
+		}
+	} else {
+		setStatusMode('progress');
+		engine.startGame({
+			'onProgress': function (current, total) {
+				if (current > 0 && total > 0) {
+					statusProgress.value = current;
+					statusProgress.max = total;
+				} else {
+					statusProgress.removeAttribute('value');
+					statusProgress.removeAttribute('max');
+				}
+			},
+		}).then(() => {
+			setStatusMode('hidden');
+		}, displayFailureNotice);
+	}
+}());
+		</script>
+	</body>
+</html>
+
